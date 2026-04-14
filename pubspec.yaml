@@ -1,0 +1,25 @@
+name: vaquitas_de_lym
+description: "Las Vaquitas de Lym - Juego plataformer + Control Parental"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flame: ^1.18.0          # engine 2D juego
+  flame_tiled: ^1.16.0    # mapas de niveles
+  audioplayers: ^6.0.0    # sonidos y música
+  shared_preferences: ^2.2.3  # guardar progreso
+  provider: ^6.1.2        # estado global
+  flutter_animate: ^4.5.0 # animaciones UI
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
