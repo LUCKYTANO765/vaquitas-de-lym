@@ -1,8 +1,8 @@
 import 'dart:math' show min;
 import 'dart:ui' hide TextStyle;
-import 'package:flutter/material.dart' show TextStyle, Color;
 import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
+import 'package:flutter/material.dart' show TextStyle, Color, VoidCallback;
 import 'platform.dart';
 import 'coin.dart';
 import '../vaquitas_game.dart';
@@ -16,7 +16,7 @@ class Player extends PositionComponent
 
   // ── Física ───────────────────────────────────────────────────────────────
   static const double gravity      = 900.0;
-  static const double jumpForce    = -560.0;  // altura max ≈174px
+  static const double jumpForce    = -560.0;
   static const double maxFallSpeed = 600.0;
   static const double walkAccel    = 1400.0;
   static const double maxWalkSpeed = 220.0;
@@ -28,18 +28,20 @@ class Player extends PositionComponent
   bool _facingRight = true;
   PlayerState state = PlayerState.idle;
   late Vector2 _spawnPoint;
-  int _moveInput = 0; // -1 izq | 0 stop | 1 der
-
-  // salto variable desactivado — altura fija y predecible
+  int _moveInput = 0;
 
   // ── Invulnerabilidad ──────────────────────────────────────────────────────
   double _invulnerableTimer = 0.0;
   double _flashTimer        = 0.0;
   bool   _flashVisible      = true;
 
-  // ── Animación ─────────────────────────────────────────────────────────────
-  double _animTimer = 0;
-  int    _animFrame = 0;
+  // ── Sprites ───────────────────────────────────────────────────────────────
+  late SpriteAnimationComponent _sprite;
+  late SpriteAnimation _animRunRight;
+  late SpriteAnimation _animRunLeft;
+  late SpriteAnimation _animIdleRight;
+  late SpriteAnimation _animIdleLeft;
+
 
   Player({
     required Vector2 position,
@@ -54,6 +56,52 @@ class Player extends PositionComponent
   @override
   Future<void> onLoad() async {
     _spawnPoint = position.clone();
+
+    // Cargar imágenes
+    final imgRunR  = await game.images.load('CORRER DERECHA01.png');
+    final imgRunL  = await game.images.load('CORRER IZQUIERDA01.png');
+    final imgIdleR = await game.images.load('PARADO DERECHA01.png');
+    final imgIdleL = await game.images.load('PARADO IZQUIERDA01.png');
+
+    // ── CORRER DERECHA: 4 frames con posición exacta (análisis de imagen)
+    // content y=98-277 (h=180), frames en x: 69,277,473,673
+    _animRunRight = SpriteAnimation([
+      SpriteAnimationFrame(Sprite(imgRunR, srcPosition: Vector2(69,  98), srcSize: Vector2(190, 180)), 0.12),
+      SpriteAnimationFrame(Sprite(imgRunR, srcPosition: Vector2(277, 98), srcSize: Vector2(185, 180)), 0.12),
+      SpriteAnimationFrame(Sprite(imgRunR, srcPosition: Vector2(473, 98), srcSize: Vector2(183, 180)), 0.12),
+      SpriteAnimationFrame(Sprite(imgRunR, srcPosition: Vector2(673, 98), srcSize: Vector2(189, 180)), 0.12),
+    ], loop: true);
+
+    // ── CORRER IZQUIERDA: 4 frames con posición exacta
+    // content y=124-368 (h=245), frames en x: 98,346,607,858
+    _animRunLeft = SpriteAnimation([
+      SpriteAnimationFrame(Sprite(imgRunL, srcPosition: Vector2(98,  124), srcSize: Vector2(245, 245)), 0.12),
+      SpriteAnimationFrame(Sprite(imgRunL, srcPosition: Vector2(346, 124), srcSize: Vector2(247, 245)), 0.12),
+      SpriteAnimationFrame(Sprite(imgRunL, srcPosition: Vector2(607, 124), srcSize: Vector2(239, 245)), 0.12),
+      SpriteAnimationFrame(Sprite(imgRunL, srcPosition: Vector2(858, 124), srcSize: Vector2(238, 245)), 0.12),
+    ], loop: true);
+
+    // ── PARADO DERECHA: 1 frame, content x=119-374 y=91-433
+    _animIdleRight = SpriteAnimation([
+      SpriteAnimationFrame(Sprite(imgIdleR, srcPosition: Vector2(119, 91), srcSize: Vector2(256, 343)), 1.0),
+    ], loop: true);
+
+    // ── PARADO IZQUIERDA: 1 frame, content x=63-311 y=60-416
+    _animIdleLeft = SpriteAnimation([
+      SpriteAnimationFrame(Sprite(imgIdleL, srcPosition: Vector2(63, 60), srcSize: Vector2(249, 357)), 1.0),
+    ], loop: true);
+
+    // Sprite visual: 64×80, pie alineado con el fondo del hitbox (local y=48)
+    // x=-16 centra los 64px sobre los 32px del hitbox
+    // y=-32 → bottom sprite = -32+80 = 48 = bottom hitbox ✓
+    _sprite = SpriteAnimationComponent(
+      animation: _animIdleRight,
+      size: Vector2(64, 80),
+      position: Vector2(-16, -32),
+    );
+    add(_sprite);
+
+    // Hitbox de colisión (más pequeño que el sprite visual)
     add(RectangleHitbox(
       size: Vector2(28, 44),
       position: Vector2(2, 4),
@@ -67,6 +115,7 @@ class Player extends PositionComponent
   void moveLeft(double speed)  { _moveInput = -1; }
   void moveRight(double speed) { _moveInput =  1; }
   void stopHorizontal()        { _moveInput =  0; }
+  void releaseJump()           {} // no-op: salto de altura fija
 
   void jump() {
     if (isOnGround) {
@@ -76,29 +125,25 @@ class Player extends PositionComponent
     }
   }
 
-  void releaseJump() {} // no-op: salto de altura fija
-
-  /// Inicia parpadeo de invulnerabilidad tras recibir daño.
   void startInvulnerability(double duration) {
     _invulnerableTimer = duration;
-    _flashTimer  = 0;
+    _flashTimer   = 0;
     _flashVisible = true;
   }
 
   void respawn() {
-    position = _spawnPoint.clone();
-    velocity  = Vector2.zero();
+    position   = _spawnPoint.clone();
+    velocity   = Vector2.zero();
     isOnGround = false;
-    state = PlayerState.idle;
+    state      = PlayerState.idle;
     startInvulnerability(2.0);
   }
 
-  // ── Colisiones contra plataforma (suelo) ─────────────────────────────────
-  /// Raycast manual hacia abajo. Snappea el pie a la plataforma si encuentra suelo.
+  // ── Detección de suelo ────────────────────────────────────────────────────
   bool _checkOnGround() {
     final pLeft  = position.x + 3;
     final pRight = position.x + size.x - 3;
-    final pFoot  = position.y; // anchor bottomLeft → position.y == pie
+    final pFoot  = position.y;
 
     for (final c in game.world.children) {
       if (c is! Platform) continue;
@@ -115,9 +160,8 @@ class Player extends PositionComponent
     return false;
   }
 
-  /// Empuja al jugador fuera de paredes en el eje X.
+  // ── Colisión lateral (eje X) ──────────────────────────────────────────────
   void _resolveXCollision() {
-    // Cuerpo efectivo (excluye 2 px de tolerancia arriba y abajo)
     final pTop    = position.y - size.y + 4;
     final pBottom = position.y - 2;
     final pLeft   = position.x + 2;
@@ -130,12 +174,9 @@ class Player extends PositionComponent
       final platLeft   = c.position.x;
       final platRight  = c.position.x + c.size.x;
 
-      // Sin solapamiento en Y → no hay choque lateral
       if (pBottom <= platTop || pTop >= platBottom) continue;
-      // Sin solapamiento en X → no hay choque
       if (pRight <= platLeft || pLeft >= platRight) continue;
 
-      // Empujar según dirección de movimiento
       if (velocity.x > 0) {
         position.x = platLeft - size.x + 2;
         velocity.x = 0;
@@ -151,7 +192,7 @@ class Player extends PositionComponent
   void update(double dt) {
     super.update(dt);
 
-    // 1. Invulnerabilidad / parpadeo
+    // 1. Invulnerabilidad
     if (_invulnerableTimer > 0) {
       _invulnerableTimer -= dt;
       _flashTimer += dt;
@@ -168,12 +209,11 @@ class Player extends PositionComponent
     } else if (_moveInput > 0) {
       velocity.x = (velocity.x + walkAccel * dt).clamp(-maxWalkSpeed, maxWalkSpeed);
     } else {
-      // Fricción: desaceleración exponencial suave
       velocity.x *= (1.0 - min(1.0, 10.0 * dt));
       if (velocity.x.abs() < 2) velocity.x = 0;
     }
 
-    // 3. Mover en X y resolver colisiones laterales
+    // 3. Mover X + resolver colisión lateral
     position.x += velocity.x * dt;
     _resolveXCollision();
 
@@ -183,7 +223,7 @@ class Player extends PositionComponent
       if (velocity.y > maxFallSpeed) velocity.y = maxFallSpeed;
     }
 
-    // 5. Mover en Y y resolver suelo
+    // 5. Mover Y + resolver suelo
     position.y += velocity.y * dt;
     if (velocity.y >= 0) {
       if (_checkOnGround()) {
@@ -196,7 +236,7 @@ class Player extends PositionComponent
       isOnGround = false;
     }
 
-    // 6. Estado de animación
+    // 6. Estado
     if (!isOnGround) {
       state = velocity.y < 0 ? PlayerState.jumping : PlayerState.falling;
     } else if (velocity.x.abs() > 10) {
@@ -205,107 +245,25 @@ class Player extends PositionComponent
       state = PlayerState.idle;
     }
 
-    // 7. Temporizador de animación
-    _animTimer += dt;
-    if (_animTimer >= 0.15) {
-      _animTimer = 0;
-      _animFrame = (_animFrame + 1) % 2;
-    }
-
-    // 8. Orientación
+    // 7. Dirección
     if (velocity.x >  10) _facingRight = true;
     if (velocity.x < -10) _facingRight = false;
 
-    // 9. Caída al vacío
+    // 8. Actualizar animación del sprite
+    final newAnim = (state == PlayerState.running)
+        ? (_facingRight ? _animRunRight : _animRunLeft)
+        : (_facingRight ? _animIdleRight : _animIdleLeft);
+
+    if (_sprite.animation != newAnim) _sprite.animation = newAnim;
+
+    // 9. Flash de invulnerabilidad via opacidad
+    _sprite.opacity = _flashVisible ? 1.0 : 0.0;
+
+    // 10. Caída al vacío
     if (position.y > 1400) respawn();
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  @override
-  void render(Canvas canvas) {
-    super.render(canvas);
-    if (!_flashVisible) return; // parpadea durante invulnerabilidad
-
-    if (!_facingRight) {
-      canvas.save();
-      canvas.translate(size.x, 0);
-      canvas.scale(-1, 1);
-    }
-    _drawPixelArt(canvas);
-    if (!_facingRight) canvas.restore();
-  }
-
-  void _drawPixelArt(Canvas canvas) {
-    const px = 4.0;
-
-    final bodyPaint    = Paint()..color = const Color(0xFF1565C0);
-    final hatPaint     = Paint()..color = const Color(0xFFD32F2F);
-    final skinPaint    = Paint()..color = const Color(0xFFFFCC80);
-    final whitePaint   = Paint()..color = const Color(0xFFFFFFFF);
-    final darkPaint    = Paint()..color = const Color(0xFF0D3F7F);
-    final pantsPaint   = Paint()..color = const Color(0xFF0A3D91);
-    final shoePaint    = Paint()..color = const Color(0xFF4E342E);
-    final outlinePaint = Paint()
-      ..color = const Color(0xFF111111)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    // Gorro
-    canvas.drawRect(const Rect.fromLTWH(2 * px, 0, 5 * px, px), hatPaint);
-    canvas.drawRect(const Rect.fromLTWH(3 * px, px, 3 * px, 2 * px), hatPaint);
-
-    // Cara
-    canvas.drawRect(const Rect.fromLTWH(2 * px, 3 * px, 4 * px, 3 * px), skinPaint);
-    canvas.drawRect(const Rect.fromLTWH(3 * px, 4 * px, px, px), whitePaint);
-    canvas.drawRect(const Rect.fromLTWH(5 * px, 4 * px, px, px), whitePaint);
-    final eyePaint = Paint()..color = const Color(0xFF333333);
-    canvas.drawRect(const Rect.fromLTWH(3.4 * px, 4.3 * px, px * 0.6, px * 0.6), eyePaint);
-    canvas.drawRect(const Rect.fromLTWH(5.4 * px, 4.3 * px, px * 0.6, px * 0.6), eyePaint);
-
-    // Cuerpo
-    canvas.drawRect(const Rect.fromLTWH(px, 6 * px, 6 * px, 4 * px), bodyPaint);
-    canvas.drawRect(const Rect.fromLTWH(3.5 * px, 7 * px, px * 0.6, px * 0.6), whitePaint);
-    canvas.drawRect(const Rect.fromLTWH(3.5 * px, 8.5 * px, px * 0.6, px * 0.6), whitePaint);
-
-    // Brazos
-    if (state == PlayerState.jumping || state == PlayerState.falling) {
-      canvas.drawRect(const Rect.fromLTWH(0, 5 * px, px, 2 * px), bodyPaint);
-      canvas.drawRect(const Rect.fromLTWH(7 * px, 5 * px, px, 2 * px), bodyPaint);
-      canvas.drawRect(const Rect.fromLTWH(0, 3 * px, px, 2 * px), skinPaint);
-      canvas.drawRect(const Rect.fromLTWH(7 * px, 3 * px, px, 2 * px), skinPaint);
-    } else {
-      canvas.drawRect(const Rect.fromLTWH(0, 6 * px, px, 3 * px), bodyPaint);
-      canvas.drawRect(const Rect.fromLTWH(7 * px, 6 * px, px, 3 * px), bodyPaint);
-      canvas.drawRect(const Rect.fromLTWH(0, 9 * px, px, px), skinPaint);
-      canvas.drawRect(const Rect.fromLTWH(7 * px, 9 * px, px, px), skinPaint);
-    }
-
-    // Pantalón
-    canvas.drawRect(const Rect.fromLTWH(px, 10 * px, 6 * px, 2 * px), pantsPaint);
-
-    // Piernas y zapatos
-    if (state == PlayerState.running) {
-      final legAOffset = _animFrame == 0 ? 0.0 : px;
-      final legBOffset = _animFrame == 0 ? px : 0.0;
-      canvas.drawRect(Rect.fromLTWH(px + legAOffset, 12 * px, px, 2 * px), darkPaint);
-      canvas.drawRect(Rect.fromLTWH(px + legAOffset, 10 * px, px, 2 * px), pantsPaint);
-      canvas.drawRect(Rect.fromLTWH(4 * px + legBOffset, 12 * px, px, 2 * px), darkPaint);
-      canvas.drawRect(Rect.fromLTWH(4 * px + legBOffset, 10 * px, px, 2 * px), pantsPaint);
-    } else {
-      canvas.drawRect(const Rect.fromLTWH(1.5 * px, 12 * px, px, 2 * px), darkPaint);
-      canvas.drawRect(const Rect.fromLTWH(4.5 * px, 12 * px, px, 2 * px), darkPaint);
-    }
-
-    canvas.drawRect(const Rect.fromLTWH(px, 11 * px, 2 * px, px), shoePaint);
-    canvas.drawRect(const Rect.fromLTWH(4 * px, 11 * px, 2 * px, px), shoePaint);
-
-    canvas.drawRect(
-      const Rect.fromLTWH(px, 6 * px, 6 * px, 4 * px),
-      outlinePaint,
-    );
-  }
-
-  // ── Colisiones (monedas y bandera de meta) ────────────────────────────────
+  // ── Colisiones (monedas y bandera) ────────────────────────────────────────
   @override
   void onCollisionStart(
       Set<Vector2> intersectionPoints, PositionComponent other) {

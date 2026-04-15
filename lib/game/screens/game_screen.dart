@@ -195,6 +195,40 @@ class _GameScreenState extends State<GameScreen> {
               },
             ),
           ),
+
+          // Botones (Temporales dev) para saltar de nivel
+          Positioned(
+            bottom: 8,
+            left: 8,
+            child: Row(
+              children: [
+                for (int i = 1; i <= 4; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent.withValues(alpha: 0.8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        minimumSize: const Size(60, 36),
+                      ),
+                      onPressed: () {
+                        final state = context.read<GameState>();
+                        state.currentLevel = i;
+                        state.lives = 3; // Refrescar vidas al saltar nivel
+                        setState(() {
+                          _game = VaquitasGame(
+                            gameState: state,
+                            onLevelComplete: _onLevelComplete,
+                            onGameOver: _onGameOver,
+                          );
+                        });
+                      },
+                      child: Text('Niv. $i', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );

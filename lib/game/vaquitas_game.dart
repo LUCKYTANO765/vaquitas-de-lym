@@ -134,12 +134,15 @@ class VaquitasGame extends FlameGame
       ));
     }
 
-    // Jefe solo en nivel 4
+    // Jefe final solo en nivel 4
     if (level == 4) {
       world.add(BossEnemy(
-        position: Vector2(2150, 430),
+        position: Vector2(2320, 440),
         onPlayerHit: _onPlayerHitByEnemy,
-        onBossDefeated: () => world.add(GoalFlag(position: info.goalPosition)),
+        onBossDefeated: () {
+          // Cuando el jefe muere aparece la bandera de meta
+          world.add(GoalFlag(position: Vector2(info.goalPosition.x, 440)));
+        },
       ));
     } else {
       world.add(GoalFlag(position: info.goalPosition));

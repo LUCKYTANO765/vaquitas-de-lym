@@ -2,6 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/painting.dart';
+import 'dart:math';
 import 'platform.dart';
 import 'player.dart';
 
@@ -106,11 +107,15 @@ class BossEnemy extends PositionComponent
   final VoidCallback onPlayerHit;
   final VoidCallback onBossDefeated;
 
-  int health = 3;
+  int maxHealth = 5;
+  int health = 5;
   bool _isDead = false;
   double _chargeTimer = 0;
   bool _isCharging = false;
   double _startX = 0;
+  double _baseY = 0;
+
+  late RectangleComponent _healthBar;
 
   BossEnemy({
     required Vector2 position,
@@ -118,18 +123,49 @@ class BossEnemy extends PositionComponent
     required this.onBossDefeated,
   }) : super(
             position: position,
-            size: Vector2(72, 72),
+            size: Vector2(100, 100),
             anchor: Anchor.bottomLeft);
 
   @override
   Future<void> onLoad() async {
     _startX = position.x;
+    _baseY = position.y;
+
+    // Titulo 'JEFE FINAL'
+    add(TextComponent(
+      text: 'JEFE FINAL!',
+      textRenderer: TextPaint(
+        style: const TextStyle(
+          fontSize: 18,
+          color: Color(0xFFFF5252),
+          fontWeight: FontWeight.bold,
+          shadows: [Shadow(color: Color(0xFF000000), offset: Offset(1, 1))],
+        ),
+      ),
+      position: Vector2(0, -30),
+    ));
+
+    // Emoji de Vaca Gigante
     add(TextComponent(
       text: '🐄',
-      textRenderer: TextPaint(style: const TextStyle(fontSize: 64)),
-      position: Vector2(0, -72),
+      textRenderer: TextPaint(style: const TextStyle(fontSize: 85)),
+      position: Vector2(6, 2),
     ));
-    add(RectangleHitbox());
+
+    // Barra de vida
+    add(RectangleComponent(
+      size: Vector2(100, 10),
+      position: Vector2(0, -15),
+      paint: Paint()..color = const Color(0xFF333333),
+    ));
+    _healthBar = RectangleComponent(
+      size: Vector2(100, 10),
+      position: Vector2(0, -15),
+      paint: Paint()..color = const Color(0xFF4CAF50),
+    );
+    add(_healthBar);
+
+    add(RectangleHitbox(size: Vector2(90, 80), position: Vector2(5, 20)));
   }
 
   @override
@@ -137,17 +173,32 @@ class BossEnemy extends PositionComponent
     super.update(dt);
     if (_isDead) return;
 
+    _healthBar.size.x = (health / maxHealth) * 100;
+    if (health < 3) {
+      _healthBar.paint.color = const Color(0xFFE53935);
+    } else {
+      _healthBar.paint.color = const Color(0xFF4CAF50);
+    }
+
     _chargeTimer += dt;
-    if (_chargeTimer > 3.0) {
+    // Empieza a cargar cada 2.5 segs
+    if (_chargeTimer > 2.5 && !_isCharging) {
       _chargeTimer = 0;
-      _isCharging = !_isCharging;
+      _isCharging = true;
     }
 
     if (_isCharging) {
-      position.x -= 200 * dt;
-      if (position.x < _startX - 300) _isCharging = false;
+      position.x -= 350 * dt;
+      // Efecto de saltito usando seno
+      position.y = _baseY - (sin(_chargeTimer * 15).abs() * 40);
+
+      if (position.x < _startX - 230) {
+        _isCharging = false;
+        position.y = _baseY;
+      }
     } else {
-      if (position.x < _startX) position.x += 80 * dt;
+      position.y = _baseY;
+      if (position.x < _startX) position.x += 120 * dt;
     }
   }
 
@@ -158,13 +209,24 @@ class BossEnemy extends PositionComponent
 
     if (other is Player && !_isDead && !other.isInvulnerable) {
       final playerFoot = other.position.y;
-      final bossTop    = position.y - size.y;
+      final bossTop    = _baseY - 80;
 
-      if (playerFoot <= bossTop + 20 && other.velocity.y > 0) {
+      if (playerFoot <= bossTop + 30 && other.velocity.y > 0) {
+        // Pisotón exitoso al jefe
         health--;
-        other.velocity.y = -320;
+        other.velocity.y = -400; // Gran rebote
+        
+        // Efecto visual de golpe
+        scale = Vector2(0.8, 1.2);
+        Future.delayed(const Duration(milliseconds: 150), () {
+          if (!_isDead && isMounted) scale = Vector2.all(1.0);
+        });
+
         if (health <= 0) _defeat();
       } else {
+        // El jugador es atropellado
+        other.velocity.y = -200;
+        other.velocity.x = -300; // Lanzado hacia atrás
         onPlayerHit();
       }
     }
@@ -172,13 +234,17 @@ class BossEnemy extends PositionComponent
 
   void _defeat() {
     _isDead = true;
+    scale = Vector2.all(1.0);
     add(TextComponent(
       text: '💥🐄💥',
-      textRenderer: TextPaint(style: const TextStyle(fontSize: 36)),
+      textRenderer: TextPaint(style: const TextStyle(fontSize: 90)),
+      position: Vector2(-10, -90)
     ));
-    Future.delayed(const Duration(seconds: 1), () {
-      removeFromParent();
-      onBossDefeated();
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (isMounted) {
+        removeFromParent();
+        onBossDefeated();
+      }
     });
   }
 }
