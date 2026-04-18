@@ -14,6 +14,14 @@ dependencies:
   shared_preferences: ^2.2.3  # guardar progreso
   provider: ^6.1.2        # estado global
   flutter_animate: ^4.5.0 # animaciones UI
+  image_picker: ^1.1.2    # elegir/tomar foto de la vaquita
+  firebase_core: ^3.6.0   # base Firebase
+  firebase_database: ^11.1.4  # Realtime Database
+  geolocator: ^13.0.1     # ubicacion GPS
+  workmanager: ^0.5.2     # tareas en background sin notificacion
+  flutter_map: ^7.0.2     # mapa OpenStreetMap (sin API key)
+  latlong2: ^0.9.1        # coordenadas para flutter_map
+  http: ^1.2.2            # geocoding inverso Nominatim
 
 dev_dependencies:
   flutter_test:

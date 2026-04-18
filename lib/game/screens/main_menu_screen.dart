@@ -1,10 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../game_state.dart';
 import 'game_screen.dart';
-import '../../parental/parental_gate.dart';
-import '../../parental/parental_settings_screen.dart';
+import '../../tracker/parent_panel_screen.dart';
+import '../../tracker/mini_map_widget.dart';
+
+// Codigo del padre para entrar al panel parental.
+// Cambiar aca por uno propio. Solo el padre lo sabe.
+const _parentCode = '1234';
 
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
@@ -14,10 +19,72 @@ class MainMenuScreen extends StatefulWidget {
 }
 
 class _MainMenuScreenState extends State<MainMenuScreen> {
+  int _secretTaps = 0;
+  DateTime? _firstTapAt;
+
   @override
   void initState() {
     super.initState();
     context.read<GameState>().loadProgress();
+  }
+
+  void _onSecretTap() {
+    final now = DateTime.now();
+    if (_firstTapAt == null ||
+        now.difference(_firstTapAt!) > const Duration(seconds: 3)) {
+      _firstTapAt = now;
+      _secretTaps = 1;
+      return;
+    }
+    _secretTaps++;
+    if (_secretTaps >= 5) {
+      _secretTaps = 0;
+      _firstTapAt = null;
+      _askParentCode();
+    }
+  }
+
+  Future<void> _askParentCode() async {
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Acceso restringido'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Código',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () =>
+                Navigator.pop(ctx, controller.text == _parentCode),
+            child: const Text('Entrar'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (ok == true) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ParentPanelScreen()),
+      );
+    } else if (ok == false && controller.text.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Código incorrecto')),
+      );
+    }
   }
 
   @override
@@ -33,26 +100,60 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 colors: [Color(0xFF87CEEB), Color(0xFF4CAF50)], // cielo y pasto
               ),
             ),
-            child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 24),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Título
-                  const Text(
-                    '🐄 Las Vaquitas de Lym 🐄',
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black54,
-                          offset: Offset(3, 3),
-                          blurRadius: 4,
+                  // Avatar de la vaquita del jugador
+                  Consumer<GameState>(
+                    builder: (_, state, __) {
+                      final path = state.vaquitaPhotoPath;
+                      if (path == null) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Container(
+                          width: 96,
+                          height: 96,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: Colors.black45,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 4)),
+                            ],
+                            image: DecorationImage(
+                              image: FileImage(File(path)),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
-                      ],
+                      ).animate().fadeIn().scale(begin: const Offset(0.8, 0.8));
+                    },
+                  ),
+
+                  // Título (5 taps rápidos = abrir panel parental)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _onSecretTap,
+                    child: const Text(
+                      '🐄 Las Vaquitas de Lym 🐄',
+                      style: TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black54,
+                            offset: Offset(3, 3),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   )
                       .animate()
                       .fadeIn(duration: 600.ms)
@@ -123,28 +224,17 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                       ],
                     ),
                   ).animate(delay: 700.ms).fadeIn(),
+
+                  const SizedBox(height: 16),
+
+                  // Mapa "Mi vaquita está acá"
+                  const MiniMapWidget()
+                      .animate(delay: 900.ms)
+                      .fadeIn()
+                      .slideY(begin: 0.2, end: 0),
                 ],
               ),
             ),
-          ),
-          
-          // Botón de Ajustes Parentales (Esquina)
-          Positioned(
-            top: 20,
-            right: 20,
-            child: IconButton(
-              icon: const Icon(Icons.family_restroom, color: Colors.white, size: 32),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ParentalGate(
-                      destination: ParentalSettingsScreen(),
-                    ),
-                  ),
-                );
-              },
-            ).animate(delay: 1000.ms).fadeIn(),
           ),
         ],
       ),

@@ -16,6 +16,9 @@ class GameState extends ChangeNotifier {
   int highScore = 0;
   String playerName = 'Hero';
 
+  // Foto de la vaquita elegida por el jugador (path local)
+  String? vaquitaPhotoPath;
+
   // Posicion de respawn dentro del nivel actual
   // El componente Player la actualiza; GameState la preserva entre muertes
   // (null = usar playerStart definido en LevelData)
@@ -99,6 +102,9 @@ class GameState extends ChangeNotifier {
     await prefs.setInt('highScore', highScore);
     await prefs.setString('playerName', playerName);
     await prefs.setBool('gameCompleted', gameCompleted);
+    if (vaquitaPhotoPath != null) {
+      await prefs.setString('vaquitaPhotoPath', vaquitaPhotoPath!);
+    }
   }
 
   Future<void> loadProgress() async {
@@ -109,6 +115,14 @@ class GameState extends ChangeNotifier {
     highScore = prefs.getInt('highScore') ?? 0;
     playerName = prefs.getString('playerName') ?? 'Hero';
     gameCompleted = prefs.getBool('gameCompleted') ?? false;
+    vaquitaPhotoPath = prefs.getString('vaquitaPhotoPath');
+    notifyListeners();
+  }
+
+  Future<void> setVaquitaPhoto(String path) async {
+    vaquitaPhotoPath = path;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('vaquitaPhotoPath', path);
     notifyListeners();
   }
 }
