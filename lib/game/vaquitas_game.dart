@@ -9,8 +9,9 @@ import 'game_state.dart';
 import 'components/player.dart';
 import 'components/platform.dart';
 import 'components/enemy.dart';
-import 'components/coin.dart';
+import 'components/milk_bottle.dart';
 import 'components/background.dart';
+import 'components/traps.dart';
 import 'levels/level_data.dart';
 
 class VaquitasGame extends FlameGame
@@ -108,7 +109,7 @@ class VaquitasGame extends FlameGame
   Future<void> _loadLevel(int level) async {
     _playerReady = false;
 
-    // Limpiar world (plataformas, enemigos, monedas, jugador, fondo)
+    // Limpiar world (plataformas, enemigos, botellas de leche, jugador, fondo)
     world.children
         .whereType<PositionComponent>()
         .toList()
@@ -120,9 +121,24 @@ class VaquitasGame extends FlameGame
     // Fondo de ciudad nocturna
     world.add(GameBackground(level: level));
 
-    // Plataformas
+    // Plataformas (normales y tramposas)
     for (final p in info.platforms) {
-      world.add(Platform(position: p.position, size: p.size, isGround: p.isGround));
+      world.add(Platform(
+        position: p.position,
+        size: p.size,
+        isGround: p.isGround,
+        behavior: p.behavior,
+      ));
+    }
+
+    // Pinchos trampa (Level Devil)
+    for (final s in info.spikes) {
+      world.add(SpikeTrap(
+        position: s.position,
+        widthPx: s.width,
+        hiddenInitially: s.hiddenInitially,
+        onPlayerHit: _onPlayerHitByEnemy,
+      ));
     }
 
     // Enemigos normales
@@ -144,14 +160,19 @@ class VaquitasGame extends FlameGame
           world.add(GoalFlag(position: Vector2(info.goalPosition.x, 440)));
         },
       ));
+    } else if (info.trickyGoal) {
+      world.add(TrickyGoalFlag(
+        position: info.goalPosition,
+        worldMaxX: info.worldSize.x,
+      ));
     } else {
       world.add(GoalFlag(position: info.goalPosition));
     }
 
-    // Monedas
+    // Botellas de leche
     gameState.resetCurrentLevel();
     for (final c in info.coins) {
-      world.add(Coin(position: c.position, gameState: gameState));
+      world.add(MilkBottle(position: c.position, gameState: gameState));
     }
 
     // Jugador

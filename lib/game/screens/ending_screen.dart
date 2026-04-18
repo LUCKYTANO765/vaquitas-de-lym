@@ -234,10 +234,10 @@ class _EndingScreenState extends State<EndingScreen>
   Widget _buildHeartsExplosion() {
     return Column(
       children: [
-        const Text(
-          '❤️🐄💕🎉🐄❤️\n🎊  ¡SÍ!  🎊\n💕🐄❤️🎉🐄💕',
-          style: TextStyle(fontSize: 48),
-          textAlign: TextAlign.center,
+        Image.asset(
+          'assets/images/princesa vaca.png',
+          height: 220,
+          fit: BoxFit.contain,
         )
             .animate()
             .fadeIn(duration: 400.ms)

@@ -8,9 +8,9 @@ class GameState extends ChangeNotifier {
   int score = 0;
   bool gameCompleted = false;
 
-  // Monedas
-  int coinsCollected = 0; // monedas totales acumuladas en toda la partida
-  int levelCoins = 0;     // monedas recogidas en el nivel actual
+  // Botellas de leche
+  int coinsCollected = 0; // botellas de leche totales acumuladas en toda la partida
+  int levelCoins = 0;     // botellas de leche recogidas en el nivel actual
 
   // Mejor puntuacion y nombre del jugador
   int highScore = 0;
@@ -22,7 +22,7 @@ class GameState extends ChangeNotifier {
   // ignore: prefer_final_fields
 
   // ─── Estrella del nivel ───────────────────────────────────────────────────
-  /// Devuelve 1, 2 o 3 estrellas segun cuantas monedas se recogieron
+  /// Devuelve 1, 2 o 3 estrellas segun cuantas botellas de leche se recogieron
   /// frente al total disponible en el nivel.
   int getStarsForLevel(int collectedCoins, int maxCoins) {
     if (maxCoins <= 0) return 1;
@@ -31,8 +31,8 @@ class GameState extends ChangeNotifier {
     return 1;
   }
 
-  // ─── Monedas ──────────────────────────────────────────────────────────────
-  void collectCoin() {
+  // ─── Botellas de leche ────────────────────────────────────────────────────
+  void collectMilk() {
     levelCoins++;
     coinsCollected++;
     score += 100;
@@ -54,7 +54,7 @@ class GameState extends ChangeNotifier {
       gameCompleted = true;
     }
     score += 1000;
-    levelCoins = 0; // reinicia monedas del nivel al avanzar
+    levelCoins = 0; // reinicia botellas de leche del nivel al avanzar
     _updateHighScore();
     saveProgress();
     notifyListeners();

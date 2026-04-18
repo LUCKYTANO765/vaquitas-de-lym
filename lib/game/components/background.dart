@@ -9,7 +9,11 @@ class GameBackground extends PositionComponent {
 
   @override
   Future<void> onLoad() async {
-    add(_CityNightBackground(level: level));
+    if (level == 4) {
+      add(_TowerBackground());
+    } else {
+      add(_CityNightBackground(level: level));
+    }
   }
 }
 
@@ -210,4 +214,40 @@ class _Building {
 class _Star {
   final double x, y, size, phase;
   _Star({required this.x, required this.y, required this.size, required this.phase});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FONDO NIVEL 4 — TORRE FINAL (basado en imágenes)
+// Usa las 3 imágenes de background del nivel 4 colocadas una al lado de la otra
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _TowerBackground extends PositionComponent with HasGameReference {
+  _TowerBackground()
+      : super(position: Vector2(0, 0), size: Vector2(2400, 700));
+
+  @override
+  Future<void> onLoad() async {
+    // Nombres de archivo de las 3 capas de fondo
+    final imageFiles = [
+      'backgrunad 1 nivel 4.png',
+      'backgroaund 2 nivel 4.png',
+      'backgrund 3 nivel 4.png',
+    ];
+
+    // Ancho total del mundo: 2400px → cada imagen ocupa 800px
+    const segmentWidth = 800.0;
+    const worldHeight = 700.0;
+
+    for (int i = 0; i < imageFiles.length; i++) {
+      final image = await game.images.load(imageFiles[i]);
+      final sprite = Sprite(image);
+
+      add(SpriteComponent(
+        sprite: sprite,
+        position: Vector2(i * segmentWidth, 0),
+        size: Vector2(segmentWidth, worldHeight),
+        priority: -10, // detrás de todo
+      ));
+    }
+  }
 }

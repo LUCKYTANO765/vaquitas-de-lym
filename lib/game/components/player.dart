@@ -4,7 +4,8 @@ import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
 import 'package:flutter/material.dart' show TextStyle, Color, VoidCallback;
 import 'platform.dart';
-import 'coin.dart';
+import 'milk_bottle.dart';
+import 'traps.dart';
 import '../vaquitas_game.dart';
 
 enum PlayerState { idle, running, jumping, falling }
@@ -263,13 +264,17 @@ class Player extends PositionComponent
     if (position.y > 1400) respawn();
   }
 
-  // ── Colisiones (monedas y bandera) ────────────────────────────────────────
+  // ── Colisiones (botellas de leche y bandera) ─────────────────────────────
   @override
   void onCollisionStart(
       Set<Vector2> intersectionPoints, PositionComponent other) {
     super.onCollisionStart(intersectionPoints, other);
-    if (other is Coin) other.collect();
-    if (other is GoalFlag) onReachGoal();
+    if (other is MilkBottle) other.collect();
+    if (other is TrickyGoalFlag) {
+      if (!other.tryEscape(position)) onReachGoal();
+    } else if (other is GoalFlag) {
+      onReachGoal();
+    }
   }
 }
 

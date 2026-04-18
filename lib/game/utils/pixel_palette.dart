@@ -50,7 +50,8 @@ class PixelPalette {
   static const Color enemyBrown  = Color(0xFF8B4513);
   static const Color enemySpot   = Color(0xFFFFFFFF);
 
-  // Monedas
-  static const Color coinYellow  = Color(0xFFFFD700);
-  static const Color coinShine   = Color(0xFFFFFFAA);
+  // Botellas de leche
+  static const Color milkWhite   = Color(0xFFF5F5F5);
+  static const Color milkShine   = Color(0xFFFFFFFF);
+  static const Color milkCap     = Color(0xFF42A5F5);
 }
