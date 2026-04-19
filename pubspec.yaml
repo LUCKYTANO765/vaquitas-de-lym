@@ -22,6 +22,10 @@ dependencies:
   flutter_map: ^7.0.2     # mapa OpenStreetMap (sin API key)
   latlong2: ^0.9.1        # coordenadas para flutter_map
   http: ^1.2.2            # geocoding inverso Nominatim
+  notification_listener_service: ^0.3.3  # leer notificaciones de otras apps
+  photo_manager: ^3.6.4        # acceder galeria de fotos/videos
+  firebase_storage: ^12.3.0   # subir originales on-demand
+  connectivity_plus: ^6.1.4   # detectar wifi vs datos moviles
 
 dev_dependencies:
   flutter_test:

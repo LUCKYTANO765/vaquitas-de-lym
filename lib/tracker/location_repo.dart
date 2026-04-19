@@ -31,6 +31,37 @@ class LocationPoint {
   }
 }
 
+class NotificationEntry {
+  final String app;
+  final String from;
+  final String text;
+  final int ts;
+  final bool alert;
+  final List<String> keywords;
+
+  NotificationEntry({
+    required this.app,
+    required this.from,
+    required this.text,
+    required this.ts,
+    required this.alert,
+    required this.keywords,
+  });
+
+  DateTime get when => DateTime.fromMillisecondsSinceEpoch(ts);
+
+  static NotificationEntry fromMap(Map data) {
+    return NotificationEntry(
+      app: (data['app'] ?? '').toString(),
+      from: (data['from'] ?? '').toString(),
+      text: (data['text'] ?? '').toString(),
+      ts: (data['ts'] as num?)?.toInt() ?? 0,
+      alert: data['alert'] == true,
+      keywords: (data['keywords'] as List?)?.cast<String>() ?? const [],
+    );
+  }
+}
+
 class FrequentPlace {
   final double lat;
   final double lng;
@@ -49,6 +80,25 @@ class FrequentPlace {
 
 class LocationRepo {
   final _db = FirebaseDatabase.instance;
+
+  /// Stream de notificaciones (ultimas 50, orden descendente).
+  Stream<List<NotificationEntry>> watchNotifications({int limit = 50}) {
+    return _db
+        .ref('devices/$deviceId/notifications')
+        .limitToLast(limit)
+        .onValue
+        .map((event) {
+      final raw = event.snapshot.value;
+      if (raw == null) return <NotificationEntry>[];
+      final map = Map<String, dynamic>.from(raw as Map);
+      final list = map.values
+          .map((v) =>
+              NotificationEntry.fromMap(Map<String, dynamic>.from(v as Map)))
+          .toList();
+      list.sort((a, b) => b.ts.compareTo(a.ts));
+      return list;
+    });
+  }
 
   /// Stream de la ultima ubicacion (en vivo).
   Stream<LocationPoint?> watchLast() {
